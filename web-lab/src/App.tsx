@@ -100,7 +100,7 @@ export function App() {
           <directionalLight key={i} position={d.position} intensity={d.intensity} color={d.color ?? "#ffffff"} />
         ))}
         {shader.CanvasExtras && <shader.CanvasExtras />}
-        <Avatar url="/avatars/annie.vrm" shader={shader} onReady={onReady} />
+        <Avatar url="/avatars/annie.vrm" shader={shader} expression={params.get("expr") ?? undefined} onReady={onReady} />
         {!capture && <OrbitControls makeDefault />}
         <CameraRig vrm={vrm} view={view} />
       </Canvas>

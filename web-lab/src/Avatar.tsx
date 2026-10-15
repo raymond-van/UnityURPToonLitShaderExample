@@ -32,9 +32,11 @@ function applyRestPose(vrm: VRM) {
 export function Avatar({
   url,
   shader,
+  expression,
   onReady,
 }: {
   url: string;
+  expression?: string;
   shader: ShaderVariant;
   onReady: (vrm: VRM) => void;
 }) {
@@ -53,6 +55,7 @@ export function Avatar({
       applyRestPose(next);
       await shader.apply(next);
       // Settle spring bones so hair hangs naturally before the first capture.
+      if (expression) next.expressionManager?.setValue(expression, 1);
       next.update(0);
       for (let i = 0; i < 120; i++) next.springBoneManager?.update(1 / 60);
       if (disposed) return VRMUtils.deepDispose(next.scene);
@@ -67,7 +70,7 @@ export function Avatar({
       disposed = true;
       if (loaded) VRMUtils.deepDispose(loaded.scene);
     };
-  }, [url, shader, onReady]);
+  }, [url, shader, expression, onReady]);
 
   useFrame((_, delta) => vrm?.update(Math.min(delta, 1 / 30)));
 
