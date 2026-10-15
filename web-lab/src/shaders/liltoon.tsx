@@ -17,6 +17,34 @@ export function LilToonRendering() {
   return null;
 }
 
+// three-liltoon writes sRGB output itself and ignores renderer.toneMapping, so
+// next to tone-mapped MToon it looks washed out. Apply three's ACES Filmic curve
+// (r3f's default) just before lilToon's sRGB conversion.
+const ACES_GLSL = `
+highp vec3 labRRTAndODTFit(highp vec3 v) {
+  highp vec3 a = v * (v + 0.0245786) - 0.000090537;
+  highp vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+  return a / b;
+}
+highp vec3 labACESFilmic(highp vec3 color) {
+  const highp mat3 inputMat = mat3(
+    vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+  const highp mat3 outputMat = mat3(
+    vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+  color *= 1.0 / 0.6;
+  color = outputMat * labRRTAndODTFit(inputMat * color);
+  return clamp(color, 0.0, 1.0);
+}
+`;
+const SRGB_INPUT = "highp vec3 linearColor = max(out_var_SV_Target.rgb, vec3(0.0));";
+
+function addToneMapping(shader: { fragmentShader: string }) {
+  if (!shader.fragmentShader.includes(SRGB_INPUT)) return;
+  shader.fragmentShader = shader.fragmentShader
+    .replace("void main()", `${ACES_GLSL}\nvoid main()`)
+    .replace(SRGB_INPUT, "highp vec3 linearColor = labACESFilmic(max(out_var_SV_Target.rgb, vec3(0.0)));");
+}
+
 export function stripMToonOutlines(json: GltfJson) {
   for (const material of json.materials ?? []) {
     const mtoon = material.extensions?.VRMC_materials_mtoon;
@@ -71,6 +99,7 @@ function toLilToon(source: MToonLike): LilToonMaterial {
     renderMode: source.transparent ? "transparent" : source.alphaTest > 0 ? "cutout" : "opaque",
     properties,
   });
+  material.onBeforeCompile = addToneMapping;
   return material;
 }
 
