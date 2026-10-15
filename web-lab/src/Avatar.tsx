@@ -4,8 +4,16 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import type { ShaderVariant } from "./shaders";
 
-const loader = new GLTFLoader();
-loader.register((parser) => new VRMLoaderPlugin(parser));
+function createLoader(shader: ShaderVariant) {
+  const loader = new GLTFLoader();
+  // Runs before the VRM plugin reads materials, so variants can retune MToon params.
+  loader.register((parser) => {
+    shader.patchGltf?.(parser.json);
+    return { name: "LAB_patch_gltf" };
+  });
+  loader.register((parser) => new VRMLoaderPlugin(parser));
+  return loader;
+}
 
 // Relaxed standing pose instead of the bind T-pose.
 function applyRestPose(vrm: VRM) {
@@ -36,7 +44,7 @@ export function Avatar({
     let disposed = false;
     let loaded: VRM | null = null;
     (async () => {
-      const gltf = await loader.loadAsync(url);
+      const gltf = await createLoader(shader).loadAsync(url);
       const next = gltf.userData.vrm as VRM;
       VRMUtils.removeUnnecessaryVertices(gltf.scene);
       VRMUtils.combineSkeletons(gltf.scene);
