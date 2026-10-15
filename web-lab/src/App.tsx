@@ -99,6 +99,7 @@ export function App() {
         {light.directional.map((d, i) => (
           <directionalLight key={i} position={d.position} intensity={d.intensity} color={d.color ?? "#ffffff"} />
         ))}
+        {shader.CanvasExtras && <shader.CanvasExtras />}
         <Avatar url="/avatars/annie.vrm" shader={shader} onReady={onReady} />
         {!capture && <OrbitControls makeDefault />}
         <CameraRig vrm={vrm} view={view} />

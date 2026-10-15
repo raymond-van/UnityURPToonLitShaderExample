@@ -7,9 +7,9 @@ import type { GltfJson } from ".";
 // so the shade side equals the lit side. Body and clothes also use
 // shadingShift = 1, which keeps them fully lit at any light angle.
 
-type Rgb = [number, number, number];
+export type Rgb = [number, number, number];
 
-type Look = {
+export type Look = {
   shade: Rgb;
   shift: number;
   toony: number;
@@ -60,7 +60,7 @@ const HAIR: Look = {
   outlineColor: [0.2, 0.08, 0.08],
 };
 
-function lookFor(name: string): Look | null {
+export function lookFor(name: string): Look | null {
   if (name.includes("_Face_") && name.includes("_SKIN")) return FACE;
   if (name.includes("_SKIN")) return SKIN;
   if (name.includes("_CLOTH")) return CLOTH;
