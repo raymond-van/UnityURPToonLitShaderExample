@@ -68,6 +68,8 @@ function toLilToon(source: MToonLike): LilToonMaterial {
   const properties: Record<string, number | number[]> = {
     _Color: [c.r, c.g, c.b, source.opacity],
     _Cull: source.side === 2 ? 0 : 2,
+    // lilToon's transparent mode writes depth by default; MToon's does not.
+    _ZWrite: source.depthWrite ? 1 : 0,
     _UseShadow: look ? 1 : 0,
     _UseRim: look ? 1 : 0,
     _UseOutline: look ? 1 : 0,
