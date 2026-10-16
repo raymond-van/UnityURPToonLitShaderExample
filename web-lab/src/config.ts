@@ -1,5 +1,11 @@
 // Fixed scene presets so screenshots are comparable across shaders.
 
+// Animama's Included Avatars (VRoid samples), copied in by hand (see README).
+export const AVATARS = [
+  { id: "annie", label: "Annie (A_1)", url: "/avatars/annie.vrm" },
+  { id: "y0", label: "Y_0", url: "/avatars/y0.vrm" },
+];
+
 export type LightPreset = {
   id: string;
   label: string;

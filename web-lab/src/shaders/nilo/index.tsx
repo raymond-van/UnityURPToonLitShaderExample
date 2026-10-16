@@ -5,14 +5,14 @@ import {
   FloatType,
   Mesh,
   Quaternion,
-  Vector3,
   WebGLRenderTarget,
+  type ShaderMaterial,
   type Material,
   type Object3D,
   type PerspectiveCamera,
 } from "three";
 import type { VRM } from "@pixiv/three-vrm";
-import { blankDepth, createNiloMaterial, niloShared, type NiloParams } from "./niloMaterial";
+import { applyNiloLook, blankDepth, createNiloMaterial, createNiloShared, type NiloParams, type NiloShared } from "./niloMaterial";
 
 type Part = "face" | "faceParts" | "skin" | "cloth" | "hair";
 
@@ -84,18 +84,23 @@ export function styleParams(part: Part): NiloParams {
   }
 }
 
-const outlineMaterials = new Set<Material>();
-const heads = new Set<Object3D>();
+type NiloContext = { shared: NiloShared; outlines: Material[]; head: Object3D | null };
+
+function contextOf(scene: Object3D): NiloContext | null {
+  for (const child of scene.children) if (child.userData.nilo) return child.userData.nilo as NiloContext;
+  return null;
+}
 
 export function applyNilo(vrm: VRM, paramsFor: (part: Part) => NiloParams) {
-  outlineMaterials.clear();
+  const shared = createNiloShared();
+  const outlines: Material[] = [];
   const surfaces = new Map<Material, [Material, Material | null]>();
   const convert = (m: Material) => {
     if (!surfaces.has(m)) {
       const p = paramsFor(partFor(m.name));
-      const outline = p.outline ? createNiloMaterial(m, p, true) : null;
-      if (outline) outlineMaterials.add(outline);
-      surfaces.set(m, [createNiloMaterial(m, p, false), outline]);
+      const outline = p.outline ? createNiloMaterial(m, p, true, shared) : null;
+      if (outline) outlines.push(outline);
+      surfaces.set(m, [createNiloMaterial(m, p, false, shared), outline]);
     }
     return surfaces.get(m)!;
   };
@@ -120,9 +125,18 @@ export function applyNilo(vrm: VRM, paramsFor: (part: Part) => NiloParams) {
   });
   for (const m of surfaces.keys()) m.dispose();
 
-  const head = vrm.humanoid.getNormalizedBoneNode("head");
-  heads.clear();
-  if (head) heads.add(head);
+  const context: NiloContext = { shared, outlines, head: vrm.humanoid.getNormalizedBoneNode("head") };
+  vrm.scene.userData.nilo = context;
+}
+
+export function updateNiloLook(vrm: VRM, look: { shadow: number; rim: number; outline: number }) {
+  vrm.scene.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if ((m as ShaderMaterial).isShaderMaterial) applyNiloLook(m as ShaderMaterial, look);
+    }
+  });
 }
 
 // Renders scene depth (without outline shells) before the main pass, for the
@@ -138,10 +152,7 @@ export function NiloRendering() {
   }, []);
 
   useEffect(() => {
-    const w = Math.floor(size.width * dpr);
-    const h = Math.floor(size.height * dpr);
-    target.setSize(w, h);
-    niloShared.uResolution.value.set(w, h);
+    target.setSize(Math.floor(size.width * dpr), Math.floor(size.height * dpr));
   }, [size, dpr, target]);
 
   useEffect(() => () => target.dispose(), [target]);
@@ -149,24 +160,31 @@ export function NiloRendering() {
   const q = useMemo(() => new Quaternion(), []);
   useFrame((state) => {
     const camera = state.camera as PerspectiveCamera;
-    niloShared.uCameraNearFar.value.set(camera.near, camera.far);
-    for (const head of heads) {
+    const nilo = contextOf(state.scene);
+    if (!nilo) {
+      gl.render(state.scene, camera);
+      return;
+    }
+    const { shared, outlines, head } = nilo;
+    shared.uResolution.value.set(target.width, target.height);
+    shared.uCameraNearFar.value.set(camera.near, camera.far);
+    if (head) {
       head.getWorldQuaternion(q);
-      niloShared.uHeadForward.value.copy(new Vector3(0, 0, 1).applyQuaternion(q));
+      shared.uHeadForward.value.set(0, 0, 1).applyQuaternion(q);
     }
 
-    for (const m of outlineMaterials) m.visible = false;
-    niloShared.uDepthOnly.value = 1;
-    niloShared.tDepth.value = blankDepth;
-    niloShared.tCasterId.value = blankDepth;
+    for (const m of outlines) m.visible = false;
+    shared.uDepthOnly.value = 1;
+    shared.tDepth.value = blankDepth;
+    shared.tCasterId.value = blankDepth;
     gl.setRenderTarget(target);
     gl.clear();
     gl.render(state.scene, camera);
     gl.setRenderTarget(null);
-    niloShared.uDepthOnly.value = 0;
-    niloShared.tDepth.value = target.depthTexture;
-    niloShared.tCasterId.value = target.texture;
-    for (const m of outlineMaterials) m.visible = true;
+    shared.uDepthOnly.value = 0;
+    shared.tDepth.value = target.depthTexture;
+    shared.tCasterId.value = target.texture;
+    for (const m of outlines) m.visible = true;
 
     gl.render(state.scene, camera);
   }, 1);

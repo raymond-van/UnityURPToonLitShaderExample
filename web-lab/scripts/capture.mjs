@@ -4,6 +4,7 @@
 //   npm run capture                       # everything
 //   npm run capture -- --shaders=mtoon    # filter (also --lights=, --views=)
 //   npm run capture -- --expr=happy       # set a VRM expression; files get a -happy suffix
+//   npm run capture -- --avatar=y0        # another avatar (see config.ts); files get a -y0 suffix
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -25,10 +26,13 @@ const filters = Object.fromEntries(
     }),
 );
 const expr = filters.expr ? [...filters.expr][0] : null;
+const avatar = filters.avatar ? [...filters.avatar][0] : null;
+const suffix = `${expr ? `-${expr}` : ""}${avatar ? `-${avatar}` : ""}`;
 const pick = (key, list) => (filters[key] ? list.filter((x) => filters[key].has(x.id)) : list);
 
-if (!existsSync(join(root, "public/avatars/annie.vrm"))) {
-  console.error("Missing public/avatars/annie.vrm (see README).");
+const avatarFile = `public/avatars/${avatar ?? "annie"}.vrm`;
+if (!existsSync(join(root, avatarFile))) {
+  console.error(`Missing ${avatarFile} (see README).`);
   process.exit(1);
 }
 
@@ -55,11 +59,11 @@ try {
     await mkdir(join(out, shader.id), { recursive: true });
     for (const light of lights) {
       for (const view of views) {
-        await page.goto(`${base}?capture&shader=${shader.id}&light=${light.id}&view=${view.id}${expr ? `&expr=${expr}` : ""}`);
+        await page.goto(`${base}?capture&shader=${shader.id}&light=${light.id}&view=${view.id}${expr ? `&expr=${expr}` : ""}${avatar ? `&avatar=${avatar}` : ""}`);
         await page.waitForFunction(() => window.__labReady || window.__labError, null, { timeout: 120_000 });
         const err = await page.evaluate(() => window.__labError);
         if (err) throw new Error(`${shader.id}/${light.id}/${view.id}: ${err}`);
-        const file = join(out, shader.id, `${light.id}-${view.id}${expr ? `-${expr}` : ""}.png`);
+        const file = join(out, shader.id, `${light.id}-${view.id}${suffix}.png`);
         await page.locator("canvas").screenshot({ path: file });
         console.log("captured", file.replace(root + "/", ""));
       }
@@ -73,7 +77,7 @@ try {
       .map(
         (s) =>
           `<tr><th>${s.label}</th>${views
-            .map((v) => `<td><img src="file://${join(out, s.id, `${light.id}-${v.id}${expr ? `-${expr}` : ""}.png`)}"></td>`)
+            .map((v) => `<td><img src="file://${join(out, s.id, `${light.id}-${v.id}${suffix}.png`)}"></td>`)
             .join("")}</tr>`,
       )
       .join("");
@@ -85,13 +89,13 @@ try {
     </style><h1>Light: ${light.label}</h1><table><thead><tr><th></th>${views
       .map((v) => `<th>${v.label}</th>`)
       .join("")}</tr></thead><tbody>${rows}</tbody></table>`;
-    const htmlPath = join(out, `sheet-${light.id}${expr ? `-${expr}` : ""}.html`);
+    const htmlPath = join(out, `sheet-${light.id}${suffix}.html`);
     await writeFile(htmlPath, html);
     const sheet = await browser.newPage({ viewport: { width: 200 + views.length * (cell + 6) + 40, height: 400 } });
     await sheet.goto(`file://${htmlPath}`);
-    await sheet.screenshot({ path: join(out, `sheet-${light.id}${expr ? `-${expr}` : ""}.png`), fullPage: true });
+    await sheet.screenshot({ path: join(out, `sheet-${light.id}${suffix}.png`), fullPage: true });
     await sheet.close();
-    console.log("sheet", `captures/sheet-${light.id}${expr ? `-${expr}` : ""}.png`);
+    console.log("sheet", `captures/sheet-${light.id}${suffix}.png`);
   }
 } finally {
   await browser.close();

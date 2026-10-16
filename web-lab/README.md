@@ -10,17 +10,23 @@ It uses the same three (0.182) and three-vrm (3.x) versions as Animama.
 npm install
 # The avatar is not committed (VRoid preset terms). Copy it from an Animama checkout:
 cp ../../animama/content/included/avatars/AvatarSample_A_1_New.vrm public/avatars/annie.vrm
+cp ../../animama/content/included/avatars/AvatarSample_Y_0.vrm public/avatars/y0.vrm
 npm run dev
 ```
 
-Pick the shader, light and view from the panel; the URL keeps the selection
-(`?shader=mtoon&light=side&view=face`).
+The top bar picks the avatar, light and view for every canvas. "+ Compare" adds
+a canvas (up to 3) copying the last one, and orbiting any canvas moves them all.
+Each canvas has its own shader and the look settings of Animama's dev "Avatar
+shader" debug panel (PR #587): look preset (Current / NiloToon-style), tone
+mapping, canvas filters, and exposure, ambient, key light, shadow, rim and
+outline sliders. The URL keeps everything, so a comparison can be bookmarked.
 
 ## Screenshots
 
 ```sh
 npm run capture                                  # every shader x light x view
 npm run capture -- --shaders=mtoon --views=face  # filter with --shaders/--lights/--views
+npm run capture -- --avatar=y0                   # another avatar; files get a -y0 suffix
 ```
 
 Shots land in `captures/<shader>/<light>-<view>.png`, plus one comparison sheet

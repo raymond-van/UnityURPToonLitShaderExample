@@ -21,15 +21,19 @@ import {
 // depth-texture shadows (hair shading the face). Nothing here comes from the
 // closed NiloToonURP source.
 
-// Shared by every Nilo material; NiloRendering keeps them current each frame.
-export const niloShared = {
-  tDepth: { value: null as Texture | null },
-  tCasterId: { value: null as Texture | null },
-  uResolution: { value: new Vector2(1, 1) },
-  uCameraNearFar: { value: new Vector2(0.05, 50) },
-  uDepthOnly: { value: 0 },
-  uHeadForward: { value: new Vector3(0, 0, 1) },
-};
+// Shared by every Nilo material of one Avatar; NiloRendering keeps them current
+// each frame. One set per canvas, since each has its own depth pass.
+export function createNiloShared() {
+  return {
+    tDepth: { value: null as Texture | null },
+    tCasterId: { value: null as Texture | null },
+    uResolution: { value: new Vector2(1, 1) },
+    uCameraNearFar: { value: new Vector2(0.05, 50) },
+    uDepthOnly: { value: 0 },
+    uHeadForward: { value: new Vector3(0, 0, 1) },
+  };
+}
+export type NiloShared = ReturnType<typeof createNiloShared>;
 
 // Bound during the depth pre-pass so no material samples the texture being written.
 export const blankDepth = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -271,7 +275,7 @@ type MToonLike = Material & {
   transparent: boolean;
 };
 
-export function createNiloMaterial(source: MToonLike, p: NiloParams, isOutline: boolean): ShaderMaterial {
+export function createNiloMaterial(source: MToonLike, p: NiloParams, isOutline: boolean, shared: NiloShared): ShaderMaterial {
   const c = source.color ?? new Color(1, 1, 1);
   const uniforms: Record<string, IUniform> = UniformsUtils.merge([
     UniformsLib.lights,
@@ -301,7 +305,7 @@ export function createNiloMaterial(source: MToonLike, p: NiloParams, isOutline: 
     },
   ]);
   // Keep the shared uniforms shared (merge clones them).
-  Object.assign(uniforms, niloShared);
+  Object.assign(uniforms, shared);
 
   const material = new ShaderMaterial({
     name: `${source.name}${isOutline ? " (Nilo outline)" : " (Nilo)"}`,
@@ -313,5 +317,17 @@ export function createNiloMaterial(source: MToonLike, p: NiloParams, isOutline: 
     depthWrite: isOutline || source.depthWrite,
     side: isOutline ? BackSide : source.side === DoubleSide ? DoubleSide : FrontSide,
   });
+  material.userData.nilo = p;
   return material;
+}
+
+/** Scale a material's shadow depth, rim and outline width from its base params (look sliders). */
+export function applyNiloLook(material: ShaderMaterial, scale: { shadow: number; rim: number; outline: number }) {
+  const p = material.userData.nilo as NiloParams | undefined;
+  if (!p) return;
+  const u = material.uniforms;
+  const deepen = (c: number) => Math.min(1, Math.max(0, c + (1 - c) * (1 - scale.shadow)));
+  u.uShadowTint.value.set(deepen(p.shadowTint[0]), deepen(p.shadowTint[1]), deepen(p.shadowTint[2]));
+  u.uRimStrength.value = p.rimStrength * scale.rim;
+  u.uOutlineWidth.value = p.outlineWidth * scale.outline;
 }

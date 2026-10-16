@@ -1,16 +1,22 @@
 import type { VRM } from "@pixiv/three-vrm";
 import type { FC } from "react";
-import { patchTunedMToon } from "./tunedMToon";
-import { LilToonRendering, applyLilToon, stripMToonOutlines } from "./liltoon";
-import { NiloRendering, applyNilo, exampleParams, styleParams } from "./nilo";
+import type { AvatarShaderLook } from "../look/look";
+import { patchTunedMToon, updateTunedMToon } from "./tunedMToon";
+import { LilToonRendering, applyLilToon, stripMToonOutlines, updateLilToon } from "./liltoon";
+import { NiloRendering, applyNilo, exampleParams, styleParams, updateNiloLook } from "./nilo";
 
-// A shader variant can rewrite the glTF JSON before load (e.g. MToon params)
-// and/or swap or tweak materials on the loaded VRM.
+/** A pane's tone-mapping uniforms, for shaders that tone-map themselves (lilToon). */
+export type ToneUniforms = { exposure: { value: number }; neutral: { value: number } };
+
+// A shader variant can rewrite the glTF JSON before three-vrm builds materials
+// (e.g. MToon params) and/or swap or tweak materials on the loaded VRM.
+// `updateLook` follows the pane's look sliders without reloading.
 export type ShaderVariant = {
   id: string;
   label: string;
-  patchGltf?: (json: GltfJson) => void;
-  apply: (vrm: VRM) => void | Promise<void>;
+  patchGltf?: (json: GltfJson, look: AvatarShaderLook) => void;
+  apply: (vrm: VRM, look: AvatarShaderLook, tone: ToneUniforms) => void | Promise<void>;
+  updateLook?: (vrm: VRM, look: AvatarShaderLook) => void;
   // Mounted inside the Canvas while the variant is active (renderer hooks).
   CanvasExtras?: FC;
 };
@@ -29,12 +35,14 @@ export const SHADERS: ShaderVariant[] = [
     label: "MToon tuned",
     patchGltf: patchTunedMToon,
     apply: () => {},
+    updateLook: updateTunedMToon,
   },
   {
     id: "liltoon",
     label: "lilToon (three-liltoon)",
     patchGltf: stripMToonOutlines,
     apply: applyLilToon,
+    updateLook: updateLilToon,
     CanvasExtras: LilToonRendering,
   },
   {
@@ -42,13 +50,15 @@ export const SHADERS: ShaderVariant[] = [
     label: "Nilo example (Colin's MIT shader)",
     patchGltf: stripMToonOutlines,
     apply: (vrm) => applyNilo(vrm, exampleParams),
+    updateLook: updateNiloLook,
     CanvasExtras: NiloRendering,
   },
   {
     id: "nilo-style",
-    label: "NiloToon-style",
+    label: "NiloToon-style (custom)",
     patchGltf: stripMToonOutlines,
     apply: (vrm) => applyNilo(vrm, styleParams),
+    updateLook: updateNiloLook,
     CanvasExtras: NiloRendering,
   },
 ];

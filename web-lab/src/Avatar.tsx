@@ -1,25 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
-import type { ShaderVariant } from "./shaders";
+import type { ShaderVariant, ToneUniforms } from "./shaders";
+import type { AvatarShaderLook } from "./look/look";
 
-function createLoader(shader: ShaderVariant) {
+function createLoader(shader: ShaderVariant, look: AvatarShaderLook) {
   const loader = new GLTFLoader();
-  // Runs before the VRM plugin reads materials, so variants can retune MToon params.
   loader.register((parser) => {
-    shader.patchGltf?.(parser.json);
-    return { name: "LAB_patch_gltf" };
+    const plugin = new VRMLoaderPlugin(parser);
+    // Patch right after the VRM 0.x compat step (where VRM 0.x files gain
+    // VRMC_materials_mtoon) and before three-vrm builds any material, as
+    // Animama's withAvatarShaderPatch does.
+    const v0Compat = plugin.materialsV0CompatPlugin;
+    const convertV0Materials = v0Compat.beforeRoot.bind(v0Compat);
+    v0Compat.beforeRoot = async () => {
+      await convertV0Materials();
+      shader.patchGltf?.(parser.json, look);
+    };
+    return plugin;
   });
-  loader.register((parser) => new VRMLoaderPlugin(parser));
   return loader;
 }
 
 // Relaxed standing pose instead of the bind T-pose.
 function applyRestPose(vrm: VRM) {
   const h = vrm.humanoid;
+  // VRM 0.x normalized bones face the other way (rotateVRM0 turns the scene),
+  // so rotations about x and z flip sign.
+  const flip = vrm.meta.metaVersion === "0" ? -1 : 1;
   const set = (name: Parameters<typeof h.getNormalizedBoneNode>[0], x: number, y: number, z: number) => {
-    h.getNormalizedBoneNode(name)?.rotation.set(x, y, z);
+    h.getNormalizedBoneNode(name)?.rotation.set(x * flip, y, z * flip);
   };
   set("leftUpperArm", 0, 0, -1.2);
   set("rightUpperArm", 0, 0, 1.2);
@@ -32,28 +43,40 @@ function applyRestPose(vrm: VRM) {
 export function Avatar({
   url,
   shader,
+  look,
+  tone,
   expression,
   onReady,
 }: {
   url: string;
   expression?: string;
   shader: ShaderVariant;
+  look: AvatarShaderLook;
+  tone: ToneUniforms;
   onReady: (vrm: VRM) => void;
 }) {
   const [vrm, setVrm] = useState<VRM | null>(null);
+  // The look at load time; later changes apply live through updateLook.
+  const lookRef = useRef(look);
+  lookRef.current = look;
+
+  useEffect(() => {
+    if (vrm) shader.updateLook?.(vrm, look);
+  }, [vrm, shader, look]);
 
   useEffect(() => {
     let disposed = false;
     let loaded: VRM | null = null;
+    setVrm(null);
     (async () => {
-      const gltf = await createLoader(shader).loadAsync(url);
+      const gltf = await createLoader(shader, lookRef.current).loadAsync(url);
       const next = gltf.userData.vrm as VRM;
       VRMUtils.removeUnnecessaryVertices(gltf.scene);
       VRMUtils.combineSkeletons(gltf.scene);
       VRMUtils.rotateVRM0(next);
       next.scene.traverse((o) => (o.frustumCulled = false));
       applyRestPose(next);
-      await shader.apply(next);
+      await shader.apply(next, lookRef.current, tone);
       // Settle spring bones so hair hangs naturally before the first capture.
       if (expression) next.expressionManager?.setValue(expression, 1);
       next.update(0);
@@ -70,7 +93,7 @@ export function Avatar({
       disposed = true;
       if (loaded) VRMUtils.deepDispose(loaded.scene);
     };
-  }, [url, shader, expression, onReady]);
+  }, [url, shader, tone, expression, onReady]);
 
   useFrame((_, delta) => vrm?.update(Math.min(delta, 1 / 30)));
 
