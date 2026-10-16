@@ -2,6 +2,7 @@ import type { VRM } from "@pixiv/three-vrm";
 import type { FC } from "react";
 import { patchTunedMToon } from "./tunedMToon";
 import { LilToonRendering, applyLilToon, stripMToonOutlines } from "./liltoon";
+import { NiloRendering, applyNilo, exampleParams, styleParams } from "./nilo";
 
 // A shader variant can rewrite the glTF JSON before load (e.g. MToon params)
 // and/or swap or tweak materials on the loaded VRM.
@@ -35,5 +36,19 @@ export const SHADERS: ShaderVariant[] = [
     patchGltf: stripMToonOutlines,
     apply: applyLilToon,
     CanvasExtras: LilToonRendering,
+  },
+  {
+    id: "nilo-example",
+    label: "Nilo example (Colin's MIT shader)",
+    patchGltf: stripMToonOutlines,
+    apply: (vrm) => applyNilo(vrm, exampleParams),
+    CanvasExtras: NiloRendering,
+  },
+  {
+    id: "nilo-style",
+    label: "NiloToon-style",
+    patchGltf: stripMToonOutlines,
+    apply: (vrm) => applyNilo(vrm, styleParams),
+    CanvasExtras: NiloRendering,
   },
 ];

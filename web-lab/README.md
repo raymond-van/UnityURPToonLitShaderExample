@@ -33,3 +33,19 @@ Add an entry to `SHADERS` in `src/shaders/index.ts`. Its `apply(vrm)` receives
 the loaded VRM and may replace or modify any material.
 
 Lights live in `src/config.ts`; `animama` mirrors Animama's main avatar canvas.
+
+## NiloToon variants
+
+- `nilo-example` ports this repo's MIT `SimpleURPToonLitOutlineExample` shader
+  with its default material values: N·L cel shade, warm shadow colour, flat
+  ambient floor (`max(indirect, direct)`), the face's half-strength shading,
+  and the two-pass outline with its camera-distance/FOV width fix and
+  view-space Z offset.
+- `nilo-style` adds a NiloToon-like look rebuilt from NiloToonURP's public
+  screenshots and docs (not its closed source): per-part saturated shadow
+  tints, a face that only darkens when lit from behind, hair shadows on the
+  face and neck from a depth pre-pass, a fixed-width depth rim light, and
+  outlines tinted from the shadow colour.
+
+Both live in `src/shaders/nilo/`. `NiloRendering` renders scene depth (and a
+caster id, so the face only takes shadows from hair) before the main pass.
