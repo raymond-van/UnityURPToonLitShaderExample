@@ -293,7 +293,7 @@ function Buttons({ label, options }: { label: string; options: { id: string; lab
 export function App() {
   const [avatarId, setAvatarId] = useParam("avatar", AVATARS[0].id);
   const [lightId, setLightId] = useParam("light", LIGHTS[0].id);
-  const [viewId, setViewId] = useParam("view", "waist");
+  const [viewId, setViewId] = useParam("view", "bust");
   const [panes, setPanes] = useState<Pane[]>(readPanes);
 
   const avatar = AVATARS.find((a) => a.id === avatarId) ?? AVATARS[0];

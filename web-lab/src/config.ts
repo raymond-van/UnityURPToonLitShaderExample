@@ -64,7 +64,7 @@ export const VIEWS: ViewPreset[] = [
   { id: "full", label: "Full body", target: [0, -0.62, 0], camera: [0, -0.5, 2.9], fov: 32 },
   // Animama's "portrait" camera preset: head height, 1.6 m back, FOV 35.
   { id: "waist", label: "Waist up (Animama)", target: [0, -0.1, 0], camera: [0, 0, 1.6], fov: 35 },
-  { id: "bust", label: "Bust 3/4", target: [0, -0.18, 0], camera: [0.6, -0.02, 1.4], fov: 30 },
+  { id: "bust", label: "Bust", target: [0, -0.14, 0], camera: [0, -0.06, 1.6], fov: 30 },
   { id: "face", label: "Face", target: [0, 0.04, 0], camera: [0, 0.06, 0.62], fov: 28 },
   { id: "profile", label: "Face profile", target: [0, 0.03, 0], camera: [0.5, 0.06, 0.38], fov: 28 },
   { id: "back", label: "Back 3/4", target: [0, -0.1, 0], camera: [-0.7, 0.05, -0.9], fov: 32 },
